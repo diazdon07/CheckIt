@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist Sidepanel</title>
+    <script src="/assets/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="/assets/bootstrap-5.0.2-dist/css/bootstrap.min.css">
+    <script src="/assets/bootstrap-5.0.2-dist/js/bootstrap.min.js"></script>
+</head>
+<style>
+    img.refreshButton {
+        cursor: pointer;
+    }
+    img.refreshButton:hover {
+        filter: brightness(0.8);
+    }
+</style>
+<body style="padding: 10px 5px;">
+    <div class="mb-3 row g-1">
+        <div class="col-auto" style="display: inline-flex; flex-direction: column; justify-content: center;">
+            <img src="/assets/icons/refresh.png" class="img-fluid refreshButton" alt="Refresh Icon" width="20" height="20" id="refreshButton">
+        </div>
+        <div class="input-group col">
+            <span class="input-group-text" id="basic-addon1"><img src="/assets/icons/search.svg"></span>
+            <input type="text" class="form-control" id="searchList" placeholder="Search..." aria-label="Search List" aria-describedby="basic-addon1">
+        </div>
+    </div>
+    <div class="checklistInfo"></div>
+</body>
+<script src="sidepanel.js"></script>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkit Extension Options</title>
+    <script src="/assets/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="/assets/bootstrap-5.0.2-dist/css/bootstrap.min.css">
+    <script src="/assets/bootstrap-5.0.2-dist/js/bootstrap.min.js"></script>
+</head>
+<body>
+    <div class="card" style="margin: 20px auto; max-width: 1000px; min-width: 300px;">
+        <div class="card-header">
+            <h3>Checkit Extension Options</h3>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label for="apiKey" class="form-label">App Script Deployment ID:</label>
+                <input type="text" class="form-control" id="apiKey">
+            </div>
+            <div class="mb-3">
+                <button type="submit" class="btn btn-primary mb-3" id="saveButton">Save</button>
+            </div>
+            <div class="mb-3">
+                <label for="apiKey" class="form-label">Select Excel Sheet:</label>
+                <select name="selectTableSheet" class="form-select" id="selectTableSheet">
+                    <option disabled hidden selected>--Select Excel Sheet Table--</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="card" style="margin: 20px auto; max-width: 1000px; min-width: 300px;">
+        <div class="card-header">
+            <h5>SidePanel Preview</h5>
+        </div>
+        <div class="card-body" id="previewSheetData">
+            <div class="input-group mb-1">
+                <div class="input-group-text">
+                    <input type="checkbox" class="form-check-input mt-0" id="idNumber1" name="category1" value="Placeholder1" aria-label="Checkbox if task already done."/>
+                </div>
+                <label for="idNumber1" class="form-control">Placeholder</label>
+            </div>
+            <div class="input-group mb-1">
+                <div class="input-group-text">
+                    <input type="checkbox" class="form-check-input mt-0" id="idNumber2" name="category2" value="Placeholder2" aria-label="Checkbox if task already done."/>
+                </div>
+                <label for="idNumber2" class="form-control">Placeholder</label>
+            </div>
+        </div>
+    </div>
+</body>
+<script src="options.js"></script>
+</html>
