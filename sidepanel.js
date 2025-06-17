@@ -1,3 +1,4 @@
+let isLoading = false;
 // Add an event listener to the side panel
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -31,6 +32,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Add an event listener to the refresh button (only once)
     refreshButton.addEventListener('click', function () {
+        // Prevent spamming if already loading
+        if (isLoading) return;
         // Get the deployment ID and selected title from storage
         chrome.storage.sync.get(['deploymentId', 'selectedTitle'], function (data) {
             if (data.deploymentId && data.selectedTitle) {
@@ -49,57 +52,87 @@ const checklistContainer = document.querySelector('.checklistInfo');
 const searchList = document.querySelector('#searchList');
 const refreshButton = document.querySelector('#refreshButton');
 
-function fetchGoogleExcelSheet(deploymentId, selectedTitle) {
+async function fetchGoogleExcelSheet(deploymentId, selectedTitle) {
+    
     // Clear previous content
-    checklistContainer.innerHTML = '';
+    loadingFunction('loading');
+    searchList.value = ''; // Clear the search box
+    refreshButton.disabled = true; // Disable the refresh button
 
-    // Fetch data from Google Apps Script
-    fetch(`https://script.google.com/macros/s/${deploymentId}/exec`)
-        .then(response => response.json())
-        .then(data => {
-            const grouped = {};
+    try {
+        // Fetch data from Google Apps Script
+        const response = await fetch(`https://script.google.com/macros/s/${deploymentId}/exec`);
 
-            // Skip header row using slice(1)
-            data[selectedTitle].slice(1).forEach(row => {
-                const content = row[2]?.trim();
-                const category = row[1]?.trim();
-                const keywordStr = row[3]?.trim();
+        // Check if the response is ok
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-                if (!content || !category) return;
+        // Parse the JSON data
+        const data = await response.json();     
+        const grouped = {};
 
-                // Split keywords into an array
-                const keywords = keywordStr ? keywordStr.split(',').map(k => k.trim()) : [];
+        // Skip header row using slice(1)
+        data[selectedTitle].slice(1).forEach(row => {
+            const content = row[2]?.trim();
+            const category = row[1]?.trim();
+            const keywordStr = row[3]?.trim();
 
-                if (!grouped[category]) {
-                    grouped[category] = [];
-                }
-                grouped[category].push({ content, keywords });
-            });
+            if (!content || !category) return;
 
-            // Sort categories alphabetically
-            const sortedCategories = Object.keys(grouped).sort();
+            // Split keywords into an array
+            const keywords = keywordStr ? keywordStr.split(',').map(k => k.trim()) : [];
 
-            // Render sorted categories and their items
-            sortedCategories.forEach(category => {
-                // const categoryTitle = `<h3>${category}</h3>`;
-                // checklistContainer.innerHTML += categoryTitle;
+            if (!grouped[category]) {
+                grouped[category] = [];
+            }
+            grouped[category].push({ content, keywords });
+        });
 
-                grouped[category].forEach((item, index) => {
-                    const id = `check-${category}-${index}`;
-                    const keywordAttr = item.keywords.join(', '); // optional, for debugging
+        // Sort categories alphabetically
+        const sortedCategories = Object.keys(grouped).sort();
 
-                    const checklistItemHTML = `
-                        <div class="input-group mb-1">
-                            <div class="input-group-text">
-                                <input class="form-check-input mt-0" type="checkbox" id="${id}" name="${category}" value="${item.content}" aria-label="Checkbox if task already done." />
-                            </div>
-                            <label class="form-control" for="${id}" keyword="${keywordAttr}">${item.content}</label>
+        // Render sorted categories and their items
+        sortedCategories.forEach(category => {
+            grouped[category].forEach((item, index) => {
+                const id = `check-${category}-${index}`;
+                const keywordAttr = item.keywords.join(', ');
+
+                const checklistItemHTML = `
+                    <div class="input-group mb-1">
+                        <div class="input-group-text">
+                            <input class="form-check-input mt-0" type="checkbox" id="${id}" name="${category}" value="${item.content}" aria-label="Checkbox if task already done." />
                         </div>
-                    `;
-                    checklistContainer.innerHTML += checklistItemHTML;
-                });
+                        <label class="form-control" for="${id}" keyword="${keywordAttr}">${item.content}</label>
+                    </div>
+                `;
+                checklistContainer.innerHTML += checklistItemHTML;
             });
-        })
-        // Handle errors in fetching the sheet
-        .catch(err => console.error("Error reading sheet:", err));
+        });
+    } catch (error) {
+        console.error("Error reading sheet:", error);
+    } finally {
+        // Hide loading indicator and enable the refresh button
+        loadingFunction('done');
+    }
+}
+
+function loadingFunction(status) {
+    // Show loading indicator
+    searchList.value = ''; // Clear the search box
+    refreshButton.disabled = true; // Disable the refresh button
+    if (status === 'done') {
+        isLoading = false;
+        // Remove loading indicator elemet
+        checklistContainer.querySelector('div.loading').remove();
+        refreshButton.disabled = false; // Enable the refresh button
+    } else
+    if (status === 'loading') {
+        isLoading = true;
+        checklistContainer.innerHTML = `
+            <div class="loading">
+                
+            </div>`;
+        refreshButton.disabled = true; // Disable the refresh button
+    }
 }
