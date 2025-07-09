@@ -169,24 +169,38 @@
         let foundInTabs = 0;
 
         allTabs.forEach(tab => {
-            const labels = tab.querySelectorAll('label.form-control');
+            const tabId = tab.getAttribute('id');
             let foundInThisTab = 0;
 
-            labels.forEach(label => {
-                const text = label.textContent.toLowerCase();
-                const keyword = label.getAttribute('keyword')?.toLowerCase() || '';
-                const parent = label.closest('.input-group');
-                const match = text.includes(term) || keyword.includes(term);
-                parent.style.display = match ? '' : 'none';
-                if (match) foundInThisTab++;
+            // For each accordion item in the tab
+            const accordionItems = tab.querySelectorAll('.accordion-item');
+            accordionItems.forEach(item => {
+                const checklistItems = item.querySelectorAll('.checklist-item');
+                let foundInCategory = 0;
+
+                checklistItems.forEach(labelGroup => {
+                    const label = labelGroup.querySelector('label');
+                    const text = label?.textContent.toLowerCase() || '';
+                    const keyword = label?.getAttribute('keyword')?.toLowerCase() || '';
+                    const match = text.includes(term) || keyword.includes(term);
+
+                    labelGroup.style.display = match ? '' : 'none';
+                    if (match) foundInCategory++;
+                });
+
+                // Show/hide the entire accordion-item based on results
+                item.style.display = foundInCategory > 0 ? '' : 'none';
+                if (foundInCategory > 0) foundInThisTab++;
             });
 
-            const tabId = tab.getAttribute('id');
+            // Show/hide the tab button if no results in this tab
             const tabButton = document.querySelector(`button[data-bs-target="#${tabId}"]`);
             tabButton.style.display = foundInThisTab > 0 ? '' : 'none';
+
             if (foundInThisTab > 0) foundInTabs++;
         });
 
+        // Auto-switch to first visible tab if the active one is hidden
         const firstVisibleTabBtn = document.querySelector('.nav-link:not([style*="display: none"])');
         if (firstVisibleTabBtn && !firstVisibleTabBtn.classList.contains('active')) {
             firstVisibleTabBtn.click();
