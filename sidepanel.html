@@ -18,7 +18,7 @@
     div.loading {
         position: absolute;
         width: 100%;
-        height: 100%;
+        height: -webkit-fill-available;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -74,6 +74,14 @@
     padding: 0;
     font-weight: bold;
 }
+.sortable-ghost {
+    opacity: 0.6;
+    background: #f0f0f0;
+    border: 1px dashed #aaa;
+}
+.checklistInfo {
+  overflow-y: auto;
+}
 </style>
 <body style="padding: 10px 5px;">
     <div class="mb-3 row g-1">
@@ -85,8 +93,8 @@
             <input type="text" class="form-control" id="searchList" placeholder="Search..." aria-label="Search List" aria-describedby="basic-addon1">
         </div>
     </div>
-    <div class="checklistInfo d-flex flex-column gap-2">
-    </div>
+    <div class="checklistInfo d-flex flex-column gap-2"></div>
 </body>
+<script src="/assets/sortable.min.js"></script>
 <script src="sidepanel.js"></script>
 </html>

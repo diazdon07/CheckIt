@@ -1,202 +1,157 @@
 (() => {
     let isLoading = false;
-    // Add an event listener to the side panel
-    document.addEventListener('DOMContentLoaded', function () {
-
-        // Get the deployment ID and selected title from storage
-        chrome.storage.sync.get(['deploymentId', 'selectedTitle'], function (data) {
-            if (data.deploymentId) {
-                // Fetch the Google Apps Script deployment ID
-                fetchGoogleExcelSheet(data.deploymentId, data.selectedTitle);
-            }
-        });
-
-        // Add input event listener to the search box (only once)
-        let searchTimeout;
-        searchList.addEventListener('input', function () {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const searchTerm = this.value.toLowerCase(); // Get the lowercase search term
-                const titles = document.querySelectorAll('label.form-control'); // Select all checklist labels
-
-                titles.forEach(title => {
-                    const text = title.textContent.toLowerCase(); // Get the visible text
-                    const keywords = title.getAttribute('keyword')?.toLowerCase() || ''; // Get keywords from keyword attribute
-
-                    const parentBlock = title.parentElement; // Get the parent container (the whole checklist item)
-
-                    // Show item if the search term matches the visible text or keywords
-                    if (text.includes(searchTerm) || keywords.includes(searchTerm)) {
-                        parentBlock.style.display = ''; // Show the item
-                    } else {
-                        parentBlock.style.display = 'none'; // Hide the item
-                    }
-                });
-            }, 300); // wait 300ms after typing stops
-        });
-
-        // Add an event listener to the refresh button (only once)
-        refreshButton.addEventListener('click', function () {
-            // Prevent spamming if already loading
-            if (isLoading) return;
-            isLoading = true;      // immediately lock
-            loadingFunction('loading'); // show loading state
-            // Get the deployment ID and selected title from storage
-            chrome.storage.sync.get(['deploymentId', 'selectedTitle'], function (data) {
-                if (!data.deploymentId || !data.selectedTitle) {
-                    checklistContainer.innerHTML = `
-                        <div class="alert alert-warning" role="alert">
-                            Deployment ID or Selected Title is missing. Please configure your settings.
-                        </div>`;
-                    return;
-                } else {
-                    // Fetch the Google Excel sheet with the current deployment ID and selected title
-                    fetchGoogleExcelSheet(data.deploymentId, data.selectedTitle);
-                }
-            });
-        });
-
-    });
-
-    // Get the elements from the DOM sidepanel
     const checklistContainer = document.querySelector('.checklistInfo');
     const searchList = document.querySelector('#searchList');
     const refreshButton = document.querySelector('#refreshButton');
 
-    async function fetchGoogleExcelSheet(deploymentId, selectedTitle) {
-        
-        // Clear previous content
+    document.addEventListener('DOMContentLoaded', function () {
+        chrome.storage.sync.get(['deploymentId'], function (data) {
+            if (data.deploymentId) {
+                fetchGoogleExcelSheet(data.deploymentId);
+            }
+        });
+
+        searchList.addEventListener('input', handleSearch);
+        refreshButton.addEventListener('click', function () {
+            if (isLoading) return;
+            loadingFunction('loading');
+            chrome.storage.sync.get(['deploymentId'], function (data) {
+                if (!data.deploymentId) {
+                    checklistContainer.innerHTML = `
+                        <div class="alert alert-warning" role="alert">
+                            Deployment ID is missing. Please configure your settings.
+                        </div>`;
+                    loadingFunction('done');
+                    return;
+                }
+                fetchGoogleExcelSheet(data.deploymentId);
+            });
+        });
+    });
+
+    async function fetchGoogleExcelSheet(deploymentId) {
         loadingFunction('loading');
-        searchList.value = ''; // Clear the search box
-        refreshButton.disabled = true; // Disable the refresh button
+        searchList.value = '';
+        refreshButton.disabled = true;
 
         try {
-            // Fetch data from Google Apps Script
             const response = await fetch(`https://script.google.com/macros/s/${deploymentId}/exec`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
 
-            // Check if the response is ok
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            checklistContainer.innerHTML = '';
 
-            // Parse the JSON data
-            const data = await response.json();     
-            const grouped = {};
+            const tabNav = document.createElement('ul');
+            tabNav.className = 'nav nav-tabs mb-3';
+            const tabContent = document.createElement('div');
+            tabContent.className = 'tab-content';
 
-            // Skip header row using slice(1)
-            data[selectedTitle].slice(1).forEach(row => {
-                const getDate = row[0]?.trim();
-                const getContent = row[2]?.trim();
-                const getCategory = row[1]?.trim();
-                const getKeywordStr = row[3]?.trim();
-                const getStatus = row[4]?.trim();
+            checklistContainer.appendChild(tabNav);
+            checklistContainer.appendChild(tabContent);
 
-                if (!getContent || !getCategory) return;
+            const parentTitles = Object.keys(data);
 
-                // Split keywords into an array
-                const keywords = getKeywordStr ? getKeywordStr.split(',').map(k => k.trim()) : [];
+            chrome.storage.sync.get(['customOrder'], (storageData) => {
+                const savedOrder = storageData.customOrder || {};
 
-                if (!grouped[getCategory]) {
-                    grouped[getCategory] = [];
-                }
-                grouped[getCategory].push({ getDate, getContent, keywords, getStatus });
-            });
+                parentTitles.forEach((title, tabIndex) => {
+                    const tabId = `tab-${tabIndex}`;
+                    tabNav.innerHTML += `
+                        <li class="nav-item">
+                            <button class="nav-link ${tabIndex === 0 ? 'active' : ''}" 
+                                id="${tabId}-tab" data-bs-toggle="tab" data-bs-target="#${tabId}" 
+                                type="button" role="tab" aria-controls="${tabId}" aria-selected="${tabIndex === 0}">
+                                ${title}
+                            </button>
+                        </li>`;
 
-            // Sort categories alphabetically
-            const sortedCategories = Object.keys(grouped).sort();
+                    const tabPane = document.createElement('div');
+                    tabPane.className = `tab-pane fade ${tabIndex === 0 ? 'show active' : ''}`;
+                    tabPane.id = tabId;
+                    tabPane.setAttribute('role', 'tabpanel');
+                    tabPane.setAttribute('aria-labelledby', `${tabId}-tab`);
 
-            checklistContainer.innerHTML = ''; // Clear old items
-            checklistContainer.classList.add('accordion'); // add accordion class to container
+                    const accordion = document.createElement('div');
+                    accordion.className = 'accordion';
+                    tabPane.appendChild(accordion);
+                    tabContent.appendChild(tabPane);
 
-            // Render sorted categories and their items
-            sortedCategories.forEach((getCategory, catIndex) => {
-                const accordionId = `accordion-${catIndex}`;
+                    const grouped = {};
+                    data[title].slice(1).forEach(row => {
+                        const [rawDate, category, content, keywords, status] = row.map(cell => cell?.trim());
+                        if (!content || !category) return;
 
-                // Create accordion header
-                const categoryHeader = document.createElement('div');
-                categoryHeader.className = 'accordion-item mb-2';
+                        if (!grouped[category]) grouped[category] = [];
+                        grouped[category].push({ rawDate, content, keywords, status });
+                    });
 
-                // Add category title with Bootstrap 5 accordion behavior
-                categoryHeader.innerHTML = `
-                    <h2 class="accordion-header" id="heading-${accordionId}">
-                        <button class="accordion-button collapsed" type="button"
-                            data-bs-toggle="collapse" data-bs-target="#collapse-${accordionId}"
-                            aria-expanded="false" aria-controls="collapse-${accordionId}">
-                            ${getCategory}
-                        </button>
-                    </h2>
-                    <div id="collapse-${accordionId}" class="accordion-collapse collapse" aria-labelledby="heading-${accordionId}">
-                        <div class="accordion-body p-0"></div>
-                    </div>
-                `;
+                    Object.keys(grouped).forEach((category, catIndex) => {
+                        const accordionId = `accordion-${tabId}-${catIndex}`;
+                        const savedList = savedOrder[`${tabId}-${category}`] || [];
 
-                // Find the container for the checklist items in this category
-                const accordionBody = categoryHeader.querySelector('.accordion-body');
+                        const items = grouped[category];
+                        const orderedItems = savedList.length
+                            ? savedList.map(id => items.find(item => generateId(item) === id)).filter(Boolean)
+                            : items;
 
-                 grouped[getCategory].forEach((item, index) => {
-                    const id = `check-${getCategory}-${index}`;
-                    const keywordAttr = item.keywords.join(', ');
-
-                    const checklistItem = document.createElement('div');
-                    checklistItem.className = "input-group mb-1";
-
-                    // Determine if the item date is in the current month
-                    let isNew = false;
-                    if (item.getDate) {
-                        const itemDate = new Date(item.getDate);
-                        const now = new Date();
-                        if (
-                            itemDate.getFullYear() === now.getFullYear() &&
-                            itemDate.getMonth() === now.getMonth()
-                        ) {
-                            isNew = true;
-                        }
-                    }
-
-                    // Determine if the item has a status for Top Errors
-                    let hasTopError = item.getStatus && item.getStatus.trim() !== '';
-
-                    // Build the status labels HTML dynamically
-                    let statusLabelsHtml = '';
-
-                    if (hasTopError) {
-                        statusLabelsHtml += `
-                            <div class="col-auto p-0 status-list-item">
-                                <p class="textParagraph">Top Errors</p>
+                        const accordionItem = document.createElement('div');
+                        accordionItem.className = 'accordion-item mb-2';
+                        accordionItem.innerHTML = `
+                            <h2 class="accordion-header" id="heading-${accordionId}">
+                                <button class="accordion-button collapsed" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse-${accordionId}"
+                                    aria-expanded="false" aria-controls="collapse-${accordionId}">
+                                    ${category}
+                                </button>
+                            </h2>
+                            <div id="collapse-${accordionId}" class="accordion-collapse collapse" aria-labelledby="heading-${accordionId}">
+                                <div class="accordion-body p-0" id="sortable-${accordionId}"></div>
                             </div>`;
-                    }
-                    if (isNew) {
-                        statusLabelsHtml += `
-                            <div class="col-auto p-0 new-list-item">
-                                <p class="textParagraph">New</p>
-                            </div>`;
-                    }
 
-                    checklistItem.innerHTML = `
-                        <div class="position-absolute top-0" style="z-index: 1;right: 15px;">
-                            <div class="row gap-1">
-                                ${statusLabelsHtml}
-                            </div>
-                        </div>
-                        <div class="input-group-text">
-                            <input class="form-check-input mt-0" type="checkbox" id="${id}" name="${getCategory}" value="${item.getContent}" aria-label="Checkbox if task already done.">
-                        </div>
-                    `;
+                        const accordionBody = accordionItem.querySelector('.accordion-body');
 
-                    const label = document.createElement('label');
-                    label.className = "form-control pt-4 pb-4";
-                    label.setAttribute('for', id);
-                    label.setAttribute('keyword', keywordAttr);
+                        orderedItems.forEach((item, index) => {
+                            const id = generateId(item);
+                            const keywords = item.keywords?.split(',').map(k => k.trim()).join(', ') || '';
+                            const isNew = item.rawDate && new Date(item.rawDate).getMonth() === new Date().getMonth();
+                            const hasStatus = item.status?.trim();
 
-                    // Replace any newline characters (\n) with <br> tags so HTML can render them as line breaks
-                    const contentWithBreaks = item.getContent.replace(/\n/g, '<br>');
-                    label.innerHTML = contentWithBreaks; // ✅ this will display the content with line breaks
+                            const checklistItem = document.createElement('div');
+                            checklistItem.className = "input-group mb-1 checklist-item";
+                            checklistItem.setAttribute('data-id', id);
+                            checklistItem.innerHTML = `
+                                <div class="position-absolute top-0" style="z-index: 1;right: 15px;">
+                                    <div class="row gap-1">
+                                        ${hasStatus ? `<div class="col-auto p-0 status-list-item"><p class="textParagraph">${item.status}</p></div>` : ''}
+                                        ${isNew ? `<div class="col-auto p-0 new-list-item"><p class="textParagraph">New</p></div>` : ''}
+                                    </div>
+                                </div>
+                                <div class="input-group-text">
+                                    <input class="form-check-input mt-0" type="checkbox" id="${id}" value="${item.content}">
+                                </div>
+                                <label class="form-control pt-4 pb-4" for="${id}" keyword="${keywords}">${item.content.replace(/\n/g, '<br>')}</label>
+                            `;
 
-                    checklistItem.appendChild(label);
-                    accordionBody.appendChild(checklistItem);
+                            accordionBody.appendChild(checklistItem);
+                        });
+
+                        accordion.appendChild(accordionItem);
+
+                        new Sortable(accordionBody, {
+                            animation: 150,
+                            onEnd: function () {
+                                const itemIds = [...accordionBody.querySelectorAll('.checklist-item')].map(el => el.getAttribute('data-id'));
+                                chrome.storage.sync.get(['customOrder'], result => {
+                                    const updatedOrder = result.customOrder || {};
+                                    updatedOrder[`${tabId}-${category}`] = itemIds;
+                                    chrome.storage.sync.set({ customOrder: updatedOrder });
+                                });
+                            }
+                        });
+                    });
                 });
 
-                checklistContainer.appendChild(categoryHeader);
+                loadingFunction('done'); // ✅ Done after rendering all tabs
             });
         } catch (error) {
             console.error("Error reading sheet:", error);
@@ -204,10 +159,42 @@
                 <div class="alert alert-danger" role="alert">
                     Failed to load data. Please try again later.
                 </div>`;
-        } finally {
-            // Hide loading indicator and enable the refresh button
             loadingFunction('done');
         }
+    }
+
+    function handleSearch() {
+        const term = searchList.value.toLowerCase();
+        const allTabs = document.querySelectorAll('.tab-pane');
+        let foundInTabs = 0;
+
+        allTabs.forEach(tab => {
+            const labels = tab.querySelectorAll('label.form-control');
+            let foundInThisTab = 0;
+
+            labels.forEach(label => {
+                const text = label.textContent.toLowerCase();
+                const keyword = label.getAttribute('keyword')?.toLowerCase() || '';
+                const parent = label.closest('.input-group');
+                const match = text.includes(term) || keyword.includes(term);
+                parent.style.display = match ? '' : 'none';
+                if (match) foundInThisTab++;
+            });
+
+            const tabId = tab.getAttribute('id');
+            const tabButton = document.querySelector(`button[data-bs-target="#${tabId}"]`);
+            tabButton.style.display = foundInThisTab > 0 ? '' : 'none';
+            if (foundInThisTab > 0) foundInTabs++;
+        });
+
+        const firstVisibleTabBtn = document.querySelector('.nav-link:not([style*="display: none"])');
+        if (firstVisibleTabBtn && !firstVisibleTabBtn.classList.contains('active')) {
+            firstVisibleTabBtn.click();
+        }
+    }
+
+    function generateId(item) {
+        return btoa(unescape(encodeURIComponent(item.content + item.rawDate + item.status))).substring(0, 12);
     }
 
     function loadingFunction(status) {
