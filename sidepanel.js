@@ -223,7 +223,7 @@
 
         const showButton = () => {
             clearTimeout(hideTimeout);
-            button.style.opacity = '1';
+            button.style.opacity = '1'; 
             button.style.pointerEvents = 'auto';
         };
 
