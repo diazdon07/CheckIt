@@ -262,7 +262,7 @@
                             <form id="exportForm">
                                 <input class="form-control mb-2" placeholder="Name" id="exportName" value="${userName}" disabled>
                                 <input class="form-control mb-2" placeholder="Business Title" id="exportTitle" required>
-                                <textarea class="form-control mb-2" placeholder="Notes" id="exportNotes" rows="20"></textarea>
+                                <textarea class="form-control mb-2" placeholder="Notes" id="exportNotes" rows="12"></textarea>
                                 <input class="form-control mb-2" placeholder="Link" id="exportLink" type="url">
                             </form>
                         </div>
@@ -287,18 +287,33 @@
 
             const activeTab = document.querySelector('.tab-pane.active');
             const items = activeTab.querySelectorAll('.checklist-item');
-            const row = [name, title, notes, link].map(val => `"${val.replace(/"/g, '""')}"`);
 
+            // Start with name/title/notes/link
+            const rows = [
+                ['Name', name],
+                ['Title', title],
+                ['Notes', notes],
+                ['Link', link]
+            ];
+
+            // Add checklist items
             items.forEach(item => {
                 const label = item.querySelector('label')?.innerHTML
-                .replace(/<br\s*\/?>/gi, '\n')  // Convert <br> to newline
-                .replace(/<\/?[^>]+(>|$)/g, '') // Strip any other HTML tags
-                .trim() || '';
+                    .replace(/<br\s*\/?>/gi, '\n')        // Replace <br> with newline
+                    .replace(/<\/?[^>]+(>|$)/g, '')        // Strip HTML
+                    .trim() || '';
+
                 const checked = item.querySelector('input')?.checked ? 'Yes' : 'No';
-                row.push(`"${label.replace(/"/g, '""')}"`, `"${checked}"`);
+                rows.push([label, checked]);
             });
 
-            const csv = row.join(',') + '\n';
+            // Convert to CSV string
+            const csv = rows.map(([q, a]) => {
+                const escapedQ = `"${q.replace(/"/g, '""')}"`;
+                const escapedA = `"${a.replace(/"/g, '""')}"`;
+                return `${escapedQ},${escapedA}`;
+            }).join('\n');
+
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
